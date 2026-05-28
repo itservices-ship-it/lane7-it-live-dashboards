@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lane7 IT Hub</title>
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #0C0C0C; --surface: #161616; --surface2: #1E1E1E; --card: #181818;
+      --border: #2A2A2A; --pink: #FF1744; --gold: #FFD600; --blue: #00BCD4;
+      --orange: #FF6D00; --purple: #7C4DFF; --green: #00E676; --text: #FFFFFF; --sub: #888888;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── Auth wall ─────────────────────────────────────────────────────────── */
+    #auth-wall {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; flex-direction: column; gap: 0;
+    }
+    .auth-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 48px 44px; width: 400px; max-width: 92vw;
+      text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px;
+    }
+    .auth-badge {
+      width: 64px; height: 64px; border-radius: 16px; background: var(--pink);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 900; color: #fff; letter-spacing: 0.5px;
+    }
+    .auth-title { font-size: 26px; font-weight: 800; }
+    .auth-title span { color: var(--pink); }
+    .auth-sub { font-size: 13px; color: var(--sub); line-height: 1.6; max-width: 280px; }
+    .ms-btn {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; color: #000; border: none;
+      padding: 12px 24px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: opacity 0.2s; width: 100%; justify-content: center;
+      margin-top: 6px;
+    }
+    .ms-btn:hover { opacity: 0.88; }
+    .ms-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ms-logo { width: 20px; height: 20px; flex-shrink: 0; }
+    .auth-err { font-size: 12px; color: var(--pink); display: none; }
+    .auth-footer { font-size: 11px; color: var(--sub); margin-top: 8px; }
+
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: nowrap; }
+    .logo-badge { background: var(--pink); color: #fff; font-weight: 900; font-size: 13px; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .logo-text { flex-shrink: 0; }
+    .logo-title { font-size: 15px; font-weight: 700; }
+    .logo-title span { color: var(--pink); }
+    .logo-sub { font-size: 10px; color: var(--sub); margin-top: 1px; }
+
+    .tab-group { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; flex-shrink: 0; }
+    .tab-btn { background: transparent; border: none; color: var(--sub); padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { background: var(--pink); color: #fff; }
+
+    .period-group { display: flex; gap: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; flex-shrink: 0; }
+    .period-btn { background: transparent; border: none; color: var(--sub); padding: 5px 11px; border-radius: 5px; font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+    .period-btn:hover { color: var(--text); }
+    .period-btn.active { background: var(--pink); color: #fff; }
+
+    .spacer { flex: 1; }
+    .timestamp { font-size: 11px; color: var(--sub); flex-shrink: 0; }
+
+    .user-info { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0; }
+    .user-avatar { width: 26px; height: 26px; border-radius: 6px; background: var(--pink); color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .user-name { font-size: 12px; font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .user-sep { color: var(--border); }
+    .signout-btn { background: none; border: none; font-size: 11px; color: var(--sub); cursor: pointer; font-family: inherit; transition: color 0.15s; padding: 0; }
+    .signout-btn:hover { color: var(--pink); }
+
+    .btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; transition: all 0.2s; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .btn:hover { border-color: var(--pink); color: var(--pink); }
+    .icon-btn { width: 30px; height: 30px; padding: 0; justify-content: center; font-size: 15px; }
+
+    /* ── Tab panes ─────────────────────────────────────────────────────────── */
+    .tab-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .tab-pane.active { display: flex; }
+
+    /* ── Stats strip ───────────────────────────────────────────────────────── */
+    .stats-strip { display: grid; grid-template-columns: repeat(6,1fr); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .stat { background: var(--surface); padding: 12px 18px; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .stat:last-child { border-right: none; }
+    .stat-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .stat-val { font-size: 24px; font-weight: 800; line-height: 1; }
+    .stat-lbl { font-size: 10px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.7px; margin-top: 2px; }
+
+    /* ── Ticket layout ─────────────────────────────────────────────────────── */
+    .ninja-main { display: grid; grid-template-columns: 1fr 255px; flex: 1; overflow: hidden; }
+    #cloud-wrap { position: relative; overflow: hidden; }
+    #cloud-svg { display: block; }
+    .cloud-word { cursor: pointer; transition: opacity 0.25s; user-select: none; }
+    .cloud-word:hover { opacity: 0.75; }
+    .sidebar { background: var(--surface); border-left: 1px solid var(--border); overflow-y: auto; padding: 18px 14px; }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--sub); margin-bottom: 8px; margin-top: 18px; }
+    .section-title:first-child { margin-top: 0; }
+    .status-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .status-item:last-child { border-bottom: none; }
+    .status-left { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+    .status-pill { width: 7px; height: 7px; border-radius: 50%; }
+    .status-num { font-size: 16px; font-weight: 700; }
+    .bar-track { height: 2px; background: var(--border); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 2px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+    .word-item { display: flex; align-items: center; justify-content: space-between; padding: 4px 5px; border-radius: 5px; cursor: pointer; transition: background 0.15s; }
+    .word-item:hover { background: rgba(255,255,255,0.04); }
+    .word-item.active { background: rgba(255,23,68,0.12); }
+    .word-name { font-size: 12px; font-weight: 600; }
+    .word-badge { font-size: 10px; background: var(--border); padding: 2px 6px; border-radius: 10px; color: var(--sub); }
+
+    /* ── Staff layout ──────────────────────────────────────────────────────── */
+    .controls { padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--sub); font-size: 13px; pointer-events: none; }
+    .search-wrap input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px 8px 30px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+    .search-wrap input:focus { border-color: var(--blue); }
+    .search-wrap input::placeholder { color: var(--sub); }
+    .dept-chips { display: flex; gap: 5px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .dept-chips::-webkit-scrollbar { display: none; }
+    .chip { background: var(--surface2); border: 1px solid var(--border); color: var(--sub); padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 11px; font-family: inherit; white-space: nowrap; transition: all 0.2s; }
+    .chip:hover { border-color: var(--blue); color: var(--blue); }
+    .chip.active { background: var(--blue); border-color: var(--blue); color: #000; font-weight: 600; }
+    .count-badge { margin-left: auto; font-size: 11px; color: var(--sub); white-space: nowrap; }
+    .grid-wrap { flex: 1; overflow-y: auto; padding: 18px 20px; }
+    .grid-wrap::-webkit-scrollbar { width: 5px; }
+    .grid-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 12px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s, transform 0.15s; }
+    .card:hover { border-color: #3A3A3A; transform: translateY(-2px); }
+    .card-top { display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; flex-shrink: 0; color: #000; }
+    .card-name { font-size: 13px; font-weight: 700; line-height: 1.3; }
+    .card-role { font-size: 11px; color: var(--sub); margin-top: 1px; }
+    .card-dept { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 10px; width: fit-content; }
+    .card-links { display: flex; flex-direction: column; gap: 4px; }
+    .card-link { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--sub); text-decoration: none; padding: 3px 5px; border-radius: 5px; transition: background 0.15s, color 0.15s; overflow: hidden; }
+    .card-link:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .card-link .link-icon { font-size: 12px; flex-shrink: 0; }
+    .card-link .link-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #staff-state { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+
+    /* ── Shared ────────────────────────────────────────────────────────────── */
+    #ninja-loading { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 50; }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--pink); border-radius: 50%; animation: spin 0.75s linear infinite; }
+    .spinner.blue { border-top-color: var(--blue); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #tip { position: fixed; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 12px; pointer-events: none; z-index: 999; opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
+    #tip.show { opacity: 1; }
+
+    /* ── Modals ────────────────────────────────────────────────────────────── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; z-index: 200; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 450px; max-width: 92vw; }
+    .modal-title { font-size: 19px; font-weight: 800; margin-bottom: 5px; }
+    .modal-title .pink { color: var(--pink); }
+    .modal-title .blue  { color: var(--blue);  }
+    .modal-sub { font-size: 12px; color: var(--sub); margin-bottom: 20px; line-height: 1.6; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--sub); margin-bottom: 5px; }
+    .field input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; color: var(--text); font-size: 12px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+    .field input:focus { border-color: var(--pink); }
+    .field input[type="date"] { color-scheme: dark; }
+    .btn-primary { width: 100%; background: var(--pink); border: none; color: #fff; padding: 11px; border-radius: 6px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 4px; transition: opacity 0.2s; }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.2s; }
+    .btn-secondary:hover { border-color: var(--pink); color: var(--pink); }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .date-actions { display: flex; gap: 8px; }
+
+    /* ── Ticket drawer ─────────────────────────────────────────────────────── */
+    .tickets-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 150; display: flex; align-items: flex-end; }
+    .tickets-drawer { background: var(--surface); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; width: 100%; max-height: 60vh; display: flex; flex-direction: column; animation: slideUp 0.25s ease-out; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .drawer-title { font-size: 14px; font-weight: 800; }
+    .drawer-title span { color: var(--pink); }
+    .drawer-meta { font-size: 11px; color: var(--sub); margin-top: 2px; }
+    .drawer-close { background: var(--surface2); border: 1px solid var(--border); color: var(--sub); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-family: inherit; }
+    .drawer-close:hover { border-color: var(--pink); color: var(--pink); }
+    .drawer-body { overflow-y: auto; flex: 1; padding: 10px 22px 18px; }
+    .drawer-body::-webkit-scrollbar { width: 4px; }
+    .drawer-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .ticket-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .ticket-row:last-child { border-bottom: none; }
+    .ticket-id { font-size: 10px; color: var(--sub); flex-shrink: 0; padding-top: 2px; min-width: 44px; }
+    .ticket-title { font-size: 12px; flex: 1; line-height: 1.5; }
+    .ticket-status { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ticket-date { font-size: 10px; color: var(--sub); flex-shrink: 0; padding-top: 2px; }
+    .drawer-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 36px; color: var(--sub); font-size: 13px; }
+    .drawer-empty { padding: 36px; text-align: center; color: var(--sub); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- ══ AUTH WALL ═════════════════════════════════════════════════════════════ -->
+<div id="auth-wall">
+  <div class="auth-card">
+    <div class="auth-badge">L7</div>
+    <div>
+      <div class="auth-title">Lane7 <span>IT</span> Hub</div>
+    </div>
+    <div class="auth-sub">Sign in with your Lane7 Microsoft account to access IT dashboards and tools.</div>
+    <button class="ms-btn" id="sign-in-btn" onclick="signIn()">
+      <svg class="ms-logo" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-footer">Lane7 Group IT &mdash; Authorised access only</div>
+  </div>
+</div>
+
+<div id="tip"></div>
+
+<!-- Ninja setup modal -->
+<div class="overlay" id="ninja-setup" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Ticket Intelligence <span class="pink">Setup</span></div>
+    <div class="modal-sub">Connect to the NinjaRMM Azure Function. Your key is stored locally only.</div>
+    <div class="field"><label>Dashboard URL</label><input id="n-url" type="text" placeholder="https://lane7-ninjarmm-mcp-xxx.azurewebsites.net/api/dashboard"></div>
+    <div class="field"><label>Function Key</label><input id="n-key" type="password" placeholder="Paste your Azure function key"></div>
+    <button class="btn-primary" onclick="ninjaSetupSave()">Connect</button>
+  </div>
+</div>
+
+<!-- Staff setup modal -->
+<div class="overlay" id="staff-setup" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Staff Directory <span class="blue">Setup</span></div>
+    <div class="modal-sub">Connect to the Staff Directory Azure Function. Your key is stored locally only.</div>
+    <div class="field"><label>Dashboard URL</label><input id="s-url" type="text" placeholder="https://lane7-staff-directory-mcp-xxx.azurewebsites.net/dashboard"></div>
+    <div class="field"><label>Function Key</label><input id="s-key" type="password" placeholder="Paste your Azure function key"></div>
+    <button class="btn-primary" onclick="staffSetupSave()">Connect</button>
+  </div>
+</div>
+
+<!-- Custom date modal -->
+<div class="overlay" id="date-overlay" style="display:none">
+  <div class="modal" style="width:320px">
+    <div class="modal-title" style="font-size:15px;margin-bottom:14px">Custom Date Range</div>
+    <div class="date-row">
+      <div class="field"><label>From</label><input type="date" id="date-from"></div>
+      <div class="field"><label>To</label><input type="date" id="date-to"></div>
+    </div>
+    <div class="date-actions">
+      <button class="btn-secondary" onclick="document.getElementById('date-overlay').style.display='none'">Cancel</button>
+      <button class="btn-primary" style="margin-top:0" onclick="applyCustomRange()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket drawer -->
+<div class="tickets-overlay" id="tickets-overlay" style="display:none" onclick="closeTickets(event)">
+  <div class="tickets-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title">Tickets containing &ldquo;<span id="drawer-word"></span>&rdquo;</div>
+        <div class="drawer-meta" id="drawer-meta"></div>
+      </div>
+      <button class="drawer-close" onclick="closeTickets()">&times;</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- ══ HEADER ════════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo-badge">L7</div>
+  <div class="logo-text">
+    <div class="logo-title">Lane7 <span>IT</span> Hub</div>
+    <div class="logo-sub">IT Operations Dashboard</div>
+  </div>
+  <div class="tab-group">
+    <button class="tab-btn active" id="tab-btn-tickets" onclick="switchTab('tickets')">Ticket Intelligence</button>
+    <button class="tab-btn"        id="tab-btn-staff"   onclick="switchTab('staff')">Staff Directory</button>
+  </div>
+  <div class="period-group" id="period-group">
+    <button class="period-btn" id="pb-week"    onclick="setPeriod('week',event)">7 Days</button>
+    <button class="period-btn" id="pb-month"   onclick="setPeriod('month',event)">30 Days</button>
+    <button class="period-btn" id="pb-3months" onclick="setPeriod('3months',event)">3 Months</button>
+    <button class="period-btn active" id="pb-all" onclick="setPeriod('all',event)">All Time</button>
+    <button class="period-btn" id="pb-custom"  onclick="openDateModal()">Custom</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="timestamp" id="ts"></span>
+  <div class="user-info" id="user-info" style="display:none">
+    <div class="user-avatar" id="user-avatar"></div>
+    <span class="user-name"  id="user-name"></span>
+    <span class="user-sep">|</span>
+    <button class="signout-btn" onclick="signOut()">Sign out</button>
+  </div>
+  <button class="btn icon-btn" title="Settings" onclick="openSettings()">&#9881;</button>
+  <button class="btn" onclick="refreshCurrent()">&#8635; Refresh</button>
+</header>
+
+<!-- ══ TICKET INTELLIGENCE ═══════════════════════════════════════════════════ -->
+<div class="tab-pane active" id="pane-tickets">
+  <div class="stats-strip">
+    <div class="stat"><div class="stat-dot" style="background:var(--pink)"></div><div><div class="stat-val" id="s-total">—</div><div class="stat-lbl">Total Tickets</div></div></div>
+    <div class="stat"><div class="stat-dot" style="background:var(--gold)"></div><div><div class="stat-val" id="s-open">—</div><div class="stat-lbl">Open</div></div></div>
+    <div class="stat"><div class="stat-dot" style="background:var(--blue)"></div><div><div class="stat-val" id="s-inprog">—</div><div class="stat-lbl">In Progress</div></div></div>
+    <div class="stat"><div class="stat-dot" style="background:var(--orange)"></div><div><div class="stat-val" id="s-waiting">—</div><div class="stat-lbl">Waiting</div></div></div>
+    <div class="stat"><div class="stat-dot" style="background:var(--green)"></div><div><div class="stat-val" id="s-online">—</div><div class="stat-lbl">Devices Online</div></div></div>
+    <div class="stat"><div class="stat-dot" style="background:var(--sub)"></div><div><div class="stat-val" id="s-offline">—</div><div class="stat-lbl">Devices Offline</div></div></div>
+  </div>
+  <div class="ninja-main">
+    <div id="cloud-wrap">
+      <div id="ninja-loading">
+        <div class="spinner"></div>
+        <span style="font-size:12px;color:var(--sub)">Loading ticket data…</span>
+      </div>
+      <svg id="cloud-svg"></svg>
+    </div>
+    <div class="sidebar">
+      <div class="section-title">Status Breakdown</div>
+      <div id="status-list"></div>
+      <div class="section-title" style="margin-top:20px">Top Keywords</div>
+      <div id="word-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ STAFF DIRECTORY ════════════════════════════════════════════════════════ -->
+<div class="tab-pane" id="pane-staff">
+  <div class="controls" id="staff-controls" style="display:none">
+    <div class="search-wrap">
+      <span class="search-icon">&#128269;</span>
+      <input id="search" type="text" placeholder="Search name, role, department…" oninput="applyFilter()">
+    </div>
+    <div class="dept-chips" id="dept-chips"></div>
+    <span class="count-badge" id="count-badge"></span>
+  </div>
+  <div id="staff-state">
+    <div class="spinner blue"></div>
+    <span style="font-size:12px;color:var(--sub)">Loading staff directory…</span>
+  </div>
+  <div class="grid-wrap" id="grid-wrap" style="display:none">
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.7/build/d3.layout.cloud.min.js"></script>
+<script>
+// ══ MSAL CONFIG ════════════════════════════════════════════════════════════════
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '22658afe-7922-4cae-9d01-fbf31cd2f656',
+    authority: 'https://login.microsoftonline.com/7948767c-16f1-476a-8df3-432fd568b9ed',
+    redirectUri: window.location.origin + window.location.pathname
+  },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
+}
+const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG)
+
+async function initAuth() {
+  await msalInstance.initialize()
+  const accounts = msalInstance.getAllAccounts()
+  if (accounts.length > 0) {
+    onSignedIn(accounts[0])
+  } else {
+    document.getElementById('auth-wall').style.display = 'flex'
+  }
+}
+
+async function signIn() {
+  const btn = document.getElementById('sign-in-btn')
+  const err = document.getElementById('auth-err')
+  btn.disabled = true; btn.textContent = 'Signing in…'
+  err.style.display = 'none'
+  try {
+    const result = await msalInstance.loginPopup({ scopes: ['openid','profile','email'] })
+    onSignedIn(result.account)
+  } catch (e) {
+    btn.disabled = false
+    btn.innerHTML = `<svg class="ms-logo" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Sign in with Microsoft`
+    err.textContent = e.errorCode === 'user_cancelled' ? 'Sign-in cancelled.' : 'Sign-in failed. Please try again.'
+    err.style.display = 'block'
+  }
+}
+
+function onSignedIn(account) {
+  document.getElementById('auth-wall').style.display = 'none'
+  const name = account.name || account.username.split('@')[0]
+  const initials = name.trim().split(/\s+/).map(p=>p[0]).join('').slice(0,2).toUpperCase()
+  document.getElementById('user-avatar').textContent = initials
+  document.getElementById('user-name').textContent   = name
+  document.getElementById('user-info').style.display = 'flex'
+  const nc = ninjaCfg()
+  if (!nc.url || !nc.key) { document.getElementById('ninja-loading').style.display='none'; openNinjaSetup() }
+  else loadNinjaData()
+}
+
+async function signOut() {
+  await msalInstance.logoutPopup({ account: msalInstance.getAllAccounts()[0] })
+  document.getElementById('auth-wall').style.display = 'flex'
+  document.getElementById('user-info').style.display = 'none'
+}
+
+// ══ CONSTANTS ══════════════════════════════════════════════════════════════════
+const PALETTE = ['#FF1744','#FFD600','#00BCD4','#FF6D00','#7C4DFF','#00E676','#FF4081','#40C4FF','#FFAB40','#B388FF','#F06292','#4DB6AC','#FFF176','#CE93D8','#80DEEA']
+const STATUS_COLOR = { OPEN:'#FF1744', IN_PROGRESS:'#00BCD4', WAITING:'#FFD600', RESOLVED:'#00E676', CLOSED:'#616161', UNKNOWN:'#424242' }
+const AVA_PALETTE  = ['#FF1744','#FFD600','#00BCD4','#FF6D00','#7C4DFF','#00E676','#FF4081','#40C4FF','#FFAB40','#B388FF']
+const DEPT_PALETTE = {
+  IT:{ bg:'rgba(0,188,212,0.15)',col:'#00BCD4' }, Marketing:{ bg:'rgba(255,64,129,0.15)',col:'#FF4081' },
+  HR:{ bg:'rgba(124,77,255,0.15)',col:'#B388FF' }, Finance:{ bg:'rgba(255,213,0,0.15)',col:'#FFD600' },
+  Operations:{ bg:'rgba(255,109,0,0.15)',col:'#FF6D00' }, 'Food & Beverage':{ bg:'rgba(0,230,118,0.15)',col:'#00E676' },
+  Accounts:{ bg:'rgba(255,213,0,0.15)',col:'#FFD600' }, Management:{ bg:'rgba(255,23,68,0.15)',col:'#FF1744' },
+}
+
+// ══ STATE ══════════════════════════════════════════════════════════════════════
+let activeTab='tickets', activeWord=null, lastWords=[], currentPeriod='all', customFrom=null, customTo=null, allStaff=[], activeDept='All'
+
+// ══ TABS ═══════════════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  activeTab=tab
+  document.getElementById('pane-tickets').classList.toggle('active',tab==='tickets')
+  document.getElementById('pane-staff').classList.toggle('active',tab==='staff')
+  document.getElementById('tab-btn-tickets').classList.toggle('active',tab==='tickets')
+  document.getElementById('tab-btn-staff').classList.toggle('active',tab==='staff')
+  document.getElementById('period-group').style.display=tab==='tickets'?'flex':'none'
+  if (tab==='staff' && !allStaff.length) loadStaffData()
+  if (tab==='tickets' && !lastWords.length) loadNinjaData()
+}
+function openSettings() { if(activeTab==='tickets') openNinjaSetup(); else openStaffSetup() }
+function refreshCurrent() { if(activeTab==='tickets') loadNinjaData(); else loadStaffData() }
+
+// ══ NINJA CONFIG & PERIOD ══════════════════════════════════════════════════════
+function ninjaCfg() { return { url:localStorage.getItem('l7_ninja_url'), key:localStorage.getItem('l7_ninja_key') } }
+function openNinjaSetup() { const c=ninjaCfg(); if(c.url) document.getElementById('n-url').value=c.url; if(c.key) document.getElementById('n-key').value=c.key; document.getElementById('ninja-setup').style.display='flex' }
+function ninjaSetupSave() { const url=document.getElementById('n-url').value.trim().replace(/\/$/,''),key=document.getElementById('n-key').value.trim(); if(!url||!key)return; localStorage.setItem('l7_ninja_url',url); localStorage.setItem('l7_ninja_key',key); document.getElementById('ninja-setup').style.display='none'; loadNinjaData() }
+
+function setPeriod(p,evt) { currentPeriod=p; document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active')); if(evt)evt.target.classList.add('active'); else document.getElementById(`pb-${p}`)?.classList.add('active'); activeWord=null; closeTickets(); loadNinjaData() }
+function openDateModal() { document.getElementById('date-from').value=customFrom||new Date(Date.now()-30*86400000).toISOString().slice(0,10); document.getElementById('date-to').value=customTo||new Date().toISOString().slice(0,10); document.getElementById('date-overlay').style.display='flex' }
+function applyCustomRange() { const from=document.getElementById('date-from').value,to=document.getElementById('date-to').value; if(!from||!to)return; customFrom=from;customTo=to; document.getElementById('date-overlay').style.display='none'; currentPeriod='custom'; document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active')); const pb=document.getElementById('pb-custom'); pb.classList.add('active'); pb.textContent=`${from} → ${to}`; activeWord=null; closeTickets(); loadNinjaData() }
+
+function ninjaApiUrl(extra='') { const {url,key}=ninjaCfg(); let base=`${url}?code=${encodeURIComponent(key)}&period=${currentPeriod}`; if(currentPeriod==='custom'&&customFrom&&customTo) base+=`&from=${customFrom}&to=${customTo}`; return base+extra }
+
+// ══ NINJA DATA ═════════════════════════════════════════════════════════════════
+async function loadNinjaData() {
+  const {url,key}=ninjaCfg(); if(!url||!key){openNinjaSetup();return}
+  const el=document.getElementById('ninja-loading')
+  el.innerHTML='<div class="spinner"></div><span style="font-size:12px;color:var(--sub)">Loading ticket data…</span>'; el.style.display='flex'
+  try {
+    const res=await fetch(ninjaApiUrl(),{cache:'no-store'}); if(!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data=await res.json(); if(data.error) throw new Error(data.error)
+    renderNinja(data); document.getElementById('ts').textContent=`Updated ${new Date().toLocaleTimeString()}`; el.style.display='none'
+  } catch(e) { el.innerHTML=`<div style="text-align:center"><div style="font-size:28px;margin-bottom:8px">&#9888;</div><div style="font-size:13px;font-weight:700;color:var(--pink)">${e.message}</div><div style="font-size:11px;color:var(--sub);margin-top:5px">Check your function URL and key</div><button class="btn" style="margin-top:14px" onclick="loadNinjaData()">Retry</button><button class="btn" style="margin-top:6px" onclick="openNinjaSetup()">Settings</button></div>` }
+}
+
+function renderNinja({summary,devices}) {
+  document.getElementById('s-total').textContent=summary.total??'—'; document.getElementById('s-open').textContent=summary.byStatus?.OPEN??0; document.getElementById('s-inprog').textContent=summary.byStatus?.IN_PROGRESS??0; document.getElementById('s-waiting').textContent=summary.byStatus?.WAITING??0; document.getElementById('s-online').textContent=devices?.online??'—'; document.getElementById('s-offline').textContent=devices?.offline??'—'
+  renderStatus(summary.byStatus||{},summary.total||1); lastWords=summary.topWords||[]; renderWordList(lastWords); renderCloud(lastWords)
+}
+function renderStatus(byStatus,total) { document.getElementById('status-list').innerHTML=Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([s,c])=>{const col=STATUS_COLOR[s]||'#616161',pct=Math.min(100,Math.round(c/total*100));return`<div class="status-item"><div class="status-left"><span class="status-pill" style="background:${col}"></span><span>${s.replace(/_/g,' ')}</span></div><span class="status-num" style="color:${col}">${c}</span></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div>`}).join('') }
+function renderWordList(words) { document.getElementById('word-list').innerHTML=words.map((w,i)=>{const col=PALETTE[i%PALETTE.length];return`<div class="word-item" id="li-${w.word}" onclick="toggle('${w.word}')"><span class="word-name" style="color:${col}">${w.word}</span><span class="word-badge">${w.count}</span></div>`}).join('') }
+
+// ══ WORD CLOUD ═════════════════════════════════════════════════════════════════
+function renderCloud(words) {
+  const wrap=document.getElementById('cloud-wrap'),W=wrap.clientWidth,H=wrap.clientHeight
+  d3.select('#cloud-svg').selectAll('*').remove(); if(!words.length)return
+  const scale=d3.scalePow().exponent(0.5).domain([Math.min(...words.map(d=>d.count)),Math.max(...words.map(d=>d.count))]).range([12,68]).clamp(true)
+  d3.layout.cloud().size([W,H]).words(words.map((d,i)=>({text:d.text||d.word,size:scale(d.count),count:d.count,col:PALETTE[i%PALETTE.length]}))).padding(7).rotate(()=>Math.random()>0.75?90:0).font('Segoe UI').fontWeight('bold').fontSize(d=>d.size).on('end',placed=>drawCloud(placed,W,H)).start()
+}
+function drawCloud(words,W,H) {
+  const tip=document.getElementById('tip')
+  const svg=d3.select('#cloud-svg').attr('width',W).attr('height',H).append('g').attr('transform',`translate(${W/2},${H/2})`)
+  svg.selectAll('text').data(words).join('text').attr('class','cloud-word').attr('id',d=>`cw-${d.text}`).style('font-size',d=>`${d.size}px`).style('font-family','Segoe UI, sans-serif').style('font-weight','bold').style('fill',d=>d.col).attr('text-anchor','middle').attr('transform',d=>`translate(${d.x},${d.y})rotate(${d.rotate})`).style('opacity',0).text(d=>d.text)
+    .on('mousemove',(evt,d)=>{tip.innerHTML=`<strong style="color:${d.col}">${d.text}</strong>&ensp;<span style="color:var(--sub)">${d.count} mention${d.count!==1?'s':''} · click to view tickets</span>`;tip.style.left=`${evt.clientX+14}px`;tip.style.top=`${evt.clientY-14}px`;tip.classList.add('show')})
+    .on('mouseleave',()=>tip.classList.remove('show')).on('click',(_,d)=>toggle(d.text))
+    .transition().duration(500).delay((_,i)=>i*18).style('opacity',1)
+  if(activeWord) applyHighlight(activeWord)
+}
+function toggle(word) { document.getElementById('tip').classList.remove('show'); if(activeWord===word){activeWord=null;d3.selectAll('.cloud-word').style('opacity',1);document.querySelectorAll('.word-item').forEach(e=>e.classList.remove('active'));closeTickets()}else{activeWord=word;applyHighlight(word);openTickets(word)} }
+function applyHighlight(word) { d3.selectAll('.cloud-word').style('opacity',d=>d.text===word?1:0.15); document.querySelectorAll('.word-item').forEach(e=>e.classList.remove('active')); document.getElementById(`li-${word}`)?.classList.add('active') }
+
+// ══ TICKET DRAWER ══════════════════════════════════════════════════════════════
+async function openTickets(word) {
+  document.getElementById('drawer-word').textContent=word; document.getElementById('drawer-meta').textContent=''; document.getElementById('drawer-body').innerHTML='<div class="drawer-loading"><div class="spinner"></div> Loading tickets…</div>'; document.getElementById('tickets-overlay').style.display='flex'
+  try { const res=await fetch(ninjaApiUrl(`&word=${encodeURIComponent(word)}`),{cache:'no-store'}); if(!res.ok) throw new Error(`HTTP ${res.status}`); const {tickets}=await res.json(); renderTickets(word,tickets||[]) }
+  catch(e) { document.getElementById('drawer-body').innerHTML=`<div class="drawer-empty" style="color:var(--pink)">Failed to load: ${e.message}</div>` }
+}
+function renderTickets(word,tickets) {
+  const period=currentPeriod==='all'?'all time':currentPeriod==='week'?'last 7 days':currentPeriod==='month'?'last 30 days':currentPeriod==='3months'?'last 3 months':`${customFrom} to ${customTo}`
+  document.getElementById('drawer-meta').textContent=`${tickets.length} ticket${tickets.length!==1?'s':''} · ${period}`
+  if(!tickets.length){document.getElementById('drawer-body').innerHTML='<div class="drawer-empty">No tickets found for this word in the selected period.</div>';return}
+  document.getElementById('drawer-body').innerHTML=tickets.map(t=>{const col=STATUS_COLOR[(t.status||'').replace(/\s+/g,'_').toUpperCase()]||'#616161',date=t.created?new Date(t.created).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''
+  return`<div class="ticket-row"><span class="ticket-id">#${t.id}</span><span class="ticket-title">${t.title||'(no title)'}</span><span class="ticket-status" style="background:${col}22;color:${col}">${t.status||'Unknown'}</span><span class="ticket-date">${date}</span></div>`}).join('')
+}
+function closeTickets(evt) { if(evt&&evt.target!==document.getElementById('tickets-overlay'))return; document.getElementById('tickets-overlay').style.display='none'; if(activeWord){activeWord=null;d3.selectAll('.cloud-word').style('opacity',1);document.querySelectorAll('.word-item').forEach(e=>e.classList.remove('active'))} }
+
+// ══ STAFF CONFIG & DATA ════════════════════════════════════════════════════════
+function staffCfg() { return { url:localStorage.getItem('l7_staff_url'), key:localStorage.getItem('l7_staff_key') } }
+function openStaffSetup() { const c=staffCfg(); if(c.url) document.getElementById('s-url').value=c.url; if(c.key) document.getElementById('s-key').value=c.key; document.getElementById('staff-setup').style.display='flex' }
+function staffSetupSave() { const url=document.getElementById('s-url').value.trim().replace(/\/$/,''),key=document.getElementById('s-key').value.trim(); if(!url||!key)return; localStorage.setItem('l7_staff_url',url); localStorage.setItem('l7_staff_key',key); document.getElementById('staff-setup').style.display='none'; loadStaffData() }
+
+async function loadStaffData() {
+  const {url,key}=staffCfg(); if(!url||!key){openStaffSetup();return}
+  showStaffState('<div class="spinner blue"></div><span style="font-size:12px;color:var(--sub)">Loading staff directory…</span>')
+  try {
+    const res=await fetch(`${url}?code=${encodeURIComponent(key)}`,{cache:'no-store'}); if(!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data=await res.json(); if(data.error) throw new Error(data.error)
+    allStaff=data.filter(s=>s.name); document.getElementById('ts').textContent=`Updated ${new Date().toLocaleTimeString()}`
+    buildDeptChips(); applyFilter()
+    document.getElementById('staff-state').style.display='none'; document.getElementById('grid-wrap').style.display='block'; document.getElementById('staff-controls').style.display='flex'
+  } catch(e) { showStaffState(`<div style="text-align:center"><div style="font-size:28px;margin-bottom:8px">&#9888;</div><div style="font-size:13px;font-weight:700;color:var(--pink)">${e.message}</div><div style="font-size:11px;color:var(--sub);margin-top:5px">Check your function URL and key</div><button class="btn" style="margin-top:14px" onclick="loadStaffData()">Retry</button><button class="btn" style="margin-top:6px" onclick="openStaffSetup()">Settings</button></div>`) }
+}
+function showStaffState(html) { document.getElementById('grid-wrap').style.display='none'; document.getElementById('staff-controls').style.display='none'; const s=document.getElementById('staff-state'); s.style.display='flex'; s.innerHTML=html }
+
+// ══ STAFF FILTER & RENDER ══════════════════════════════════════════════════════
+function buildDeptChips() { const depts=['All',...new Set(allStaff.map(s=>s.department||'Unknown').sort())]; document.getElementById('dept-chips').innerHTML=depts.map(d=>`<button class="chip ${d==='All'?'active':''}" onclick="setDept('${esc(d)}')" id="chip-${d.replace(/\s+/g,'-')}">${esc(d)}</button>`).join('') }
+function setDept(dept) { activeDept=dept; document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); document.getElementById(`chip-${dept.replace(/\s+/g,'-')}`)?.classList.add('active'); applyFilter() }
+function applyFilter() {
+  const q=(document.getElementById('search')?.value||'').toLowerCase().trim()
+  const filtered=allStaff.filter(s=>{const dm=activeDept==='All'||(s.department||'Unknown')===activeDept;if(!dm)return false;if(!q)return true;return[s.name,s.jobTitle,s.department,s.email,s.office].some(v=>v&&v.toLowerCase().includes(q))}).sort((a,b)=>(a.name||'').localeCompare(b.name||''))
+  renderGrid(filtered); document.getElementById('count-badge').textContent=`${filtered.length} of ${allStaff.length} staff`
+}
+function renderGrid(staff) {
+  const grid=document.getElementById('grid')
+  if(!staff.length){grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--sub)"><div style="font-size:36px;margin-bottom:10px">&#128100;</div><p style="font-size:13px">No staff members match your search.</p></div>`;return}
+  grid.innerHTML=staff.map(s=>{const bg=avatarColor(s.name),dept=s.department||'Unknown',ds=deptStyle(dept)
+  return`<div class="card"><div class="card-top"><div class="avatar" style="background:${bg}">${initials(s.name)}</div><div><div class="card-name">${esc(s.name)}</div><div class="card-role">${esc(s.jobTitle)||'<span style="color:var(--border);font-style:italic">No role set</span>'}</div></div></div><div class="card-dept" style="background:${ds.bg};color:${ds.col}">${esc(dept)}</div><div class="card-links">${s.office?`<span class="card-link"><span class="link-icon">&#128205;</span><span class="link-text">${esc(s.office)}</span></span>`:''} ${s.email?`<a class="card-link" href="mailto:${esc(s.email)}"><span class="link-icon">&#9993;</span><span class="link-text">${esc(s.email)}</span></a>`:''}</div></div>`}).join('')
+}
+function deptStyle(dept) { const m=Object.entries(DEPT_PALETTE).find(([k])=>dept&&dept.toLowerCase().includes(k.toLowerCase())); return m?m[1]:{bg:'rgba(255,255,255,0.06)',col:'#888'} }
+function avatarColor(name) { if(!name)return AVA_PALETTE[0]; let h=0; for(let i=0;i<name.length;i++)h=(h*31+name.charCodeAt(i))%AVA_PALETTE.length; return AVA_PALETTE[Math.abs(h)] }
+function initials(name) { if(!name)return'?'; const p=name.trim().split(/\s+/); return(p[0][0]+(p[p.length-1]?.[0]||'')).toUpperCase() }
+function esc(s) { if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+// ══ RESIZE & REFRESH ═══════════════════════════════════════════════════════════
+let resizeT
+window.addEventListener('resize',()=>{clearTimeout(resizeT);resizeT=setTimeout(()=>{if(lastWords.length)renderCloud(lastWords)},250)})
+setInterval(()=>{if(activeTab==='tickets')loadNinjaData()},5*60*1000)
+setInterval(()=>{if(activeTab==='staff')loadStaffData()},10*60*1000)
+
+// ══ INIT ═══════════════════════════════════════════════════════════════════════
+initAuth()
+</script>
+</body>
+</html>
