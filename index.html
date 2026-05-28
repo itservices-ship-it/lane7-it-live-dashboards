@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>L7 Dashboards</title>
-  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+  <script src="https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js"
+          onerror="this.onerror=null;this.src='https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js'">
+  </script>
   <style>
     :root {
       --bg: #0C0C0C; --surface: #161616; --surface2: #1E1E1E; --card: #181818;
@@ -361,9 +363,16 @@ const MSAL_CONFIG = {
   },
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
 }
-const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG)
+let msalInstance = null
 
 async function initAuth() {
+  if (typeof msal === 'undefined') {
+    document.getElementById('auth-err').textContent = 'Failed to load Microsoft auth library. Check your internet connection and try again.'
+    document.getElementById('auth-err').style.display = 'block'
+    document.getElementById('sign-in-btn').disabled = true
+    return
+  }
+  msalInstance = new msal.PublicClientApplication(MSAL_CONFIG)
   await msalInstance.initialize()
   // Handle the redirect response when returning from Microsoft login
   try {
