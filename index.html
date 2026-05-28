@@ -361,7 +361,7 @@ const MSAL_CONFIG = {
     authority: 'https://login.microsoftonline.com/7948767c-16f1-476a-8df3-432fd568b9ed',
     redirectUri: window.location.origin + window.location.pathname
   },
-  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
+  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
 }
 let msalInstance = null
 
