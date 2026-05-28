@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lane7 IT Hub</title>
+  <title>L7 Dashboards</title>
   <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
   <style>
     :root {
@@ -203,7 +203,7 @@
   <div class="auth-card">
     <div class="auth-badge">L7</div>
     <div>
-      <div class="auth-title">Lane7 <span>IT</span> Hub</div>
+      <div class="auth-title">L7 <span>Dashboards</span></div>
     </div>
     <div class="auth-sub">Sign in with your Lane7 Microsoft account to access IT dashboards and tools.</div>
     <button class="ms-btn" id="sign-in-btn" onclick="signIn()">
@@ -277,8 +277,8 @@
 <header>
   <div class="logo-badge">L7</div>
   <div class="logo-text">
-    <div class="logo-title">Lane7 <span>IT</span> Hub</div>
-    <div class="logo-sub">IT Operations Dashboard</div>
+    <div class="logo-title">L7 <span>Dashboards</span></div>
+    <div class="logo-sub">IT Operations</div>
   </div>
   <div class="tab-group">
     <button class="tab-btn active" id="tab-btn-tickets" onclick="switchTab('tickets')">Ticket Intelligence</button>
@@ -365,27 +365,30 @@ const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG)
 
 async function initAuth() {
   await msalInstance.initialize()
-  const accounts = msalInstance.getAllAccounts()
-  if (accounts.length > 0) {
-    onSignedIn(accounts[0])
-  } else {
-    document.getElementById('auth-wall').style.display = 'flex'
+  // Handle the redirect response when returning from Microsoft login
+  try {
+    const response = await msalInstance.handleRedirectPromise()
+    if (response) { onSignedIn(response.account); return }
+  } catch (e) {
+    document.getElementById('auth-err').textContent = 'Sign-in error: ' + (e.errorCode || e.message)
+    document.getElementById('auth-err').style.display = 'block'
   }
+  const accounts = msalInstance.getAllAccounts()
+  if (accounts.length > 0) { onSignedIn(accounts[0]) }
+  else { document.getElementById('auth-wall').style.display = 'flex' }
 }
 
 async function signIn() {
   const btn = document.getElementById('sign-in-btn')
-  const err = document.getElementById('auth-err')
-  btn.disabled = true; btn.textContent = 'Signing in…'
-  err.style.display = 'none'
+  btn.disabled = true; btn.textContent = 'Redirecting to Microsoft…'
+  document.getElementById('auth-err').style.display = 'none'
   try {
-    const result = await msalInstance.loginPopup({ scopes: ['openid','profile','email'] })
-    onSignedIn(result.account)
+    await msalInstance.loginRedirect({ scopes: ['openid','profile','email'] })
   } catch (e) {
     btn.disabled = false
     btn.innerHTML = `<svg class="ms-logo" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Sign in with Microsoft`
-    err.textContent = e.errorCode === 'user_cancelled' ? 'Sign-in cancelled.' : 'Sign-in failed. Please try again.'
-    err.style.display = 'block'
+    document.getElementById('auth-err').textContent = 'Sign-in failed. Please try again.'
+    document.getElementById('auth-err').style.display = 'block'
   }
 }
 
@@ -402,9 +405,7 @@ function onSignedIn(account) {
 }
 
 async function signOut() {
-  await msalInstance.logoutPopup({ account: msalInstance.getAllAccounts()[0] })
-  document.getElementById('auth-wall').style.display = 'flex'
-  document.getElementById('user-info').style.display = 'none'
+  await msalInstance.logoutRedirect({ account: msalInstance.getAllAccounts()[0], postLogoutRedirectUri: window.location.href })
 }
 
 // ══ CONSTANTS ══════════════════════════════════════════════════════════════════
