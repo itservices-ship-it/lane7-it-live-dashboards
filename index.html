@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>L7 Dashboards</title>
-  <script src="https://alcdn.msftauth.net/browser/2.38.3/js/msal-browser.min.js"
-          onerror="this.onerror=null;this.src='https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js'">
-  </script>
   <style>
     :root {
       --bg: #0C0C0C; --surface: #161616; --surface2: #1E1E1E; --card: #181818;
@@ -200,28 +197,6 @@
 </head>
 <body>
 
-<!-- ══ AUTH WALL ═════════════════════════════════════════════════════════════ -->
-<div id="auth-wall">
-  <div class="auth-card">
-    <div class="auth-badge">L7</div>
-    <div>
-      <div class="auth-title">L7 <span>Dashboards</span></div>
-    </div>
-    <div class="auth-sub">Sign in with your Lane7 Microsoft account to access IT dashboards and tools.</div>
-    <button class="ms-btn" id="sign-in-btn" onclick="signIn()">
-      <svg class="ms-logo" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-      </svg>
-      Sign in with Microsoft
-    </button>
-    <div class="auth-err" id="auth-err"></div>
-    <div class="auth-footer">Lane7 Group IT &mdash; Authorised access only</div>
-  </div>
-</div>
-
 <div id="tip"></div>
 
 <!-- Ninja setup modal -->
@@ -354,67 +329,33 @@
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.7/build/d3.layout.cloud.min.js"></script>
 <script>
-// ══ MSAL CONFIG ════════════════════════════════════════════════════════════════
-const MSAL_CONFIG = {
-  auth: {
-    clientId: '22658afe-7922-4cae-9d01-fbf31cd2f656',
-    authority: 'https://login.microsoftonline.com/7948767c-16f1-476a-8df3-432fd568b9ed',
-    redirectUri: window.location.origin + window.location.pathname
-  },
-  cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
-}
-let msalInstance = null
-
+// ══ AUTH (Azure Static Web Apps /.auth/me) ════════════════════════════════════
 async function initAuth() {
-  if (typeof msal === 'undefined') {
-    document.getElementById('auth-err').textContent = 'Failed to load Microsoft auth library. Check your internet connection and try again.'
-    document.getElementById('auth-err').style.display = 'block'
-    document.getElementById('sign-in-btn').disabled = true
-    return
-  }
-  msalInstance = new msal.PublicClientApplication(MSAL_CONFIG)
-  await msalInstance.initialize()
-  // Handle the redirect response when returning from Microsoft login
   try {
-    const response = await msalInstance.handleRedirectPromise()
-    if (response) { onSignedIn(response.account); return }
-  } catch (e) {
-    document.getElementById('auth-err').textContent = 'Sign-in error: ' + (e.errorCode || e.message)
-    document.getElementById('auth-err').style.display = 'block'
-  }
-  const accounts = msalInstance.getAllAccounts()
-  if (accounts.length > 0) { onSignedIn(accounts[0]) }
-  else { document.getElementById('auth-wall').style.display = 'flex' }
+    const res = await fetch('/.auth/me', { cache: 'no-store' })
+    if (!res.ok) return startApp()
+    const { clientPrincipal } = await res.json()
+    if (!clientPrincipal) { window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(window.location.href); return }
+    const name     = clientPrincipal.userDetails || clientPrincipal.userId || 'User'
+    const display  = name.includes('@') ? name.split('@')[0] : name
+    const initials = display.trim().split(/[\s.]+/).filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase()
+    document.getElementById('user-avatar').textContent = initials
+    document.getElementById('user-name').textContent   = display
+    document.getElementById('user-info').style.display = 'flex'
+  } catch { /* running on GitHub Pages without SWA — skip auth */ }
+  startApp()
 }
 
-async function signIn() {
-  const btn = document.getElementById('sign-in-btn')
-  btn.disabled = true; btn.textContent = 'Redirecting to Microsoft…'
-  document.getElementById('auth-err').style.display = 'none'
-  try {
-    await msalInstance.loginRedirect({ scopes: ['openid','profile','email'] })
-  } catch (e) {
-    btn.disabled = false
-    btn.innerHTML = `<svg class="ms-logo" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>Sign in with Microsoft`
-    document.getElementById('auth-err').textContent = 'Sign-in failed. Please try again.'
-    document.getElementById('auth-err').style.display = 'block'
-  }
-}
-
-function onSignedIn(account) {
-  document.getElementById('auth-wall').style.display = 'none'
-  const name = account.name || account.username.split('@')[0]
-  const initials = name.trim().split(/\s+/).map(p=>p[0]).join('').slice(0,2).toUpperCase()
-  document.getElementById('user-avatar').textContent = initials
-  document.getElementById('user-name').textContent   = name
-  document.getElementById('user-info').style.display = 'flex'
+function startApp() {
   const nc = ninjaCfg()
   if (!nc.url || !nc.key) { document.getElementById('ninja-loading').style.display='none'; openNinjaSetup() }
   else loadNinjaData()
 }
 
 async function signOut() {
-  await msalInstance.logoutRedirect({ account: msalInstance.getAllAccounts()[0], postLogoutRedirectUri: window.location.href })
+  localStorage.removeItem('l7_ninja_url'); localStorage.removeItem('l7_ninja_key')
+  localStorage.removeItem('l7_staff_url'); localStorage.removeItem('l7_staff_key')
+  window.location.href = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(window.location.origin)
 }
 
 // ══ CONSTANTS ══════════════════════════════════════════════════════════════════
@@ -554,6 +495,7 @@ setInterval(()=>{if(activeTab==='staff')loadStaffData()},10*60*1000)
 
 // ══ INIT ═══════════════════════════════════════════════════════════════════════
 initAuth()
+
 </script>
 </body>
 </html>
